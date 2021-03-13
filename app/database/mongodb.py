@@ -1,6 +1,6 @@
 import pymongo
 
-from model.student import createStudentModel, updateStudentModel
+from model.chicken_farm import createChickenFarmModel, updateChickenFarmModel
 
 
 class MongoDB:
@@ -27,7 +27,7 @@ class MongoDB:
         self.connection = db[self.collection]
 
     def find(self, sort_by, order):
-        mongo_results = self.connection.find({})
+        mongo_results = self.connection.find({})  # ค้นหาทั้งหมด
         if sort_by is not None and order is not None:
             mongo_results.sort(sort_by, self._get_sort_by(order))
 
@@ -37,24 +37,37 @@ class MongoDB:
         return pymongo.DESCENDING if sort == "desc" else pymongo.ASCENDING
 
     def find_one(self, id):
-        return self.connection.find_one({"_id": id})
+        return self.connection.find_one({"_id": id})  # เลือก id ที่เจอก่อน
 
-    def create(self, student: createStudentModel):
-        student_dict = student.dict(exclude_unset=True)
+    def create(
+        self, chicken_farm: createChickenFarmModel
+    ):  # เป็นการ insert ค่าลง mongodb
+        chicken_farm_dict = chicken_farm.dict(exclude_unset=True)
 
-        insert_dict = {**student_dict, "_id": student_dict["id"]}
+        insert_dict = {**chicken_farm_dict, "_id": chicken_farm_dict["id"]}
 
         inserted_result = self.connection.insert_one(insert_dict)
-        student_id = str(inserted_result.inserted_id)
 
-        return student_id
+        chicken_farm_id = str(inserted_result.inserted_id)
 
-    def update(self, student_id, student: updateStudentModel):
+        return chicken_farm_id
+
+    def update(self, chicken_farm_id, update_chicken_farm: updateChickenFarmModel):
         updated_result = self.connection.update_one(
-            {"id": student_id}, {"$set": student.dict(exclude_unset=True)}
+            # เที่ยบกับการ update ใน mongo
+            {"id": chicken_farm_id},  # query
+            {  # update_data
+                "$set": chicken_farm.dict(exclude_unset=True)  # แปลงให้เป็น dict
+            },
         )
-        return [student_id, updated_result.modified_count]
+        return [
+            chicken_farm_id,
+            updated_result.modified_count,
+        ]  # modified_count คือ เมื่อเรา update ค่าแล้วมันมีการเปลี่ยนแปลงค่าหรือไม่
 
-    def delete(self, student_id):
-        deleted_result = self.connection.delete_one({"id": student_id})
-        return [student_id, deleted_result.deleted_count]
+    def delete(self, chicken_farm_id):
+        deleted_result = self.connection.delete_one({"id": chicken_farm_id})
+        return [
+            chicken_farm_id,
+            deleted_result.deleted_count,
+        ]  # เช็คว่ามีการลบจริงหรือไม่ ถ้าใช่เป็น 1 ถ้าไม่เป็น 0

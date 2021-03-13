@@ -6,7 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from database.mongodb import MongoDB
 from config.development import config
-from model.student import createStudentModel, updateStudentModel
+
+from model.chicken_farm import createChickenFarmModel, updateChickenFarmModel
 
 mongo_config = config["mongo_config"]
 mongo_db = MongoDB(
@@ -18,11 +19,12 @@ mongo_db = MongoDB(
     mongo_config["db"],
     mongo_config["collection"],
 )
-mongo_db._connect()
+
+mongo_db._connect()  # (เชื่อมต่อ mongo)
 
 app = FastAPI()
 
-app.add_middleware(
+app.add_middleware(  # ดักเพื่อไม่ให้คนอื่นเข้ามา แต่อันนี้ใส่ * ไว้คือเข้าได้ทุกคน
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
@@ -31,15 +33,17 @@ app.add_middleware(
 )
 
 
-@app.get("/")
+@app.get("/")  # get เป็นการค้นหา
 def index():
-    return JSONResponse(content={"message": "Student Info"}, status_code=200)
+    return JSONResponse(content={"message": "Chicken farm Info"}, status_code=200)
 
 
-@app.get("/students/")
-def get_students(
+@app.get("/chickenfarms/")  # get เป็นการค้นหา("/students/") คือนักเรียนทุกคน
+def get_chicken_farm(
     sort_by: Optional[str] = None,
-    order: Optional[str] = Query(None, min_length=3, max_length=4),
+    order: Optional[str] = Query(
+        None, min_length=3, max_length=4
+    ),  # ให้ใส่อย่างน้อย 3 แต่ห้ามเกิน 4
 ):
 
     try:
@@ -53,15 +57,23 @@ def get_students(
     )
 
 
-@app.get("/students/{student_id}")
-def get_students_by_id(student_id: str = Path(None, min_length=10, max_length=10)):
+@app.get(
+    "/chickenfarms/{chicken_farm_id}"
+)  # path parametor #get เป็นการค้นหา("/students/") คือนักเรียนตาม id ของแต่ละคน
+def get_chicken_farm_id(
+    chicken_farm_id: str = Path(None, min_length=3, max_length=3)
+):  # ใส่ค่าต้องเท่ากับ 10 ใช้ Path
     try:
-        result = mongo_db.find_one(student_id)
+        result = mongo_db.find_one(chicken_farm_id)  # หา id ที่เรากำหนด
     except:
-        raise HTTPException(status_code=500, detail="Something went wrong !!")
+        raise HTTPException(
+            status_code=500, detail="Something went wrong !!"
+        )  # server error(500)
 
     if result is None:
-        raise HTTPException(status_code=404, detail="Student Id not found !!")
+        raise HTTPException(
+            status_code=404, detail="Chicken farm Id not found !!"
+        )  # ถ้าไม่เจอ id ที่กำหนด Userใส่ค่าผิด (404)
 
     return JSONResponse(
         content={"status": "OK", "data": result},
@@ -69,10 +81,10 @@ def get_students_by_id(student_id: str = Path(None, min_length=10, max_length=10
     )
 
 
-@app.post("/students")
-def create_books(student: createStudentModel):
+@app.post("/chickenfarms")
+def create_house(chicken_farm: createChickenFarmModel):
     try:
-        student_id = mongo_db.create(student)
+        chicken_farm_id = mongo_db.create(chicken_farm)
     except:
         raise HTTPException(status_code=500, detail="Something went wrong !!")
 
@@ -80,59 +92,67 @@ def create_books(student: createStudentModel):
         content={
             "status": "ok",
             "data": {
-                "student_id": student_id,
+                "chicken_farm_id": chicken_farm_id,
+            },
+        },
+        status_code=201,  # createใช้ 201 serchใช้ 200
+    )
+
+
+@app.patch(
+    "/chickenfarms/{chicken_farm_id}"
+)  # path จะ update ค่าบางตัว (put จะเปลี่ยนค่าทั้ง collection)
+def update_house(
+    update_chicken_farm: updateChickenFarmModel,
+    chicken_farm_id: str = Path(
+        None, min_length=10, max_length=10
+    ),  # ให้ใส่ค่าเท่ากับ 10 ถ้าไม่เท่าจะ error
+):
+    try:
+        updated_chicken_farm_id, modified_count = mongo_db.update(
+            chicken_farm_id, update_chicken_farm
+        )
+    except:
+        raise HTTPException(status_code=500, detail="Something went wrong !!")
+
+    if modified_count == 0:  # ค่าเป็น 0 fild(ค่าที่ใส่) ผิด
+        raise HTTPException(
+            status_code=404,
+            detail=f"Chicken farm ID: {updated_chicken_farm_id} is not update want fields",
+        )
+
+    return JSONResponse(
+        content={
+            "status": "ok",
+            "data": {
+                "chicken_farm_id": updated_chicken_farm_id,
+                "modified_count": modified_count,
             },
         },
         status_code=201,
     )
 
 
-@app.patch("/students/{student_id}")
-def update_books(
-    student: updateStudentModel,
-    student_id: str = Path(None, min_length=10, max_length=10),
-):
-    print("student", student)
+@app.delete("/chickenfarms/{chicken_farm_id}")
+def delete_house_by_id(chicken_farm_id: str = Path(None, min_length=10, max_length=10)):
     try:
-        updated_student_id, modified_count = mongo_db.update(student_id, student)
-    except:
-        raise HTTPException(status_code=500, detail="Something went wrong !!")
-
-    if modified_count == 0:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Student Id: {updated_student_id} is not update want fields",
-        )
-
-    return JSONResponse(
-        content={
-            "status": "ok",
-            "data": {
-                "student_id": updated_student_id,
-                "modified_count": modified_count,
-            },
-        },
-        status_code=200,
-    )
-
-
-@app.delete("/students/{student_id}")
-def delete_book_by_id(student_id: str = Path(None, min_length=10, max_length=10)):
-    try:
-        deleted_student_id, deleted_count = mongo_db.delete(student_id)
+        deleted_chicken_farm_id, deleted_count = mongo_db.delete(
+            chicken_farm_id
+        )  # เรียกใช้ mongo medthod delets
     except:
         raise HTTPException(status_code=500, detail="Something went wrong !!")
 
     if deleted_count == 0:
         raise HTTPException(
-            status_code=404, detail=f"Student Id: {deleted_student_id} is not Delete"
+            status_code=404,
+            detail=f"Chicken farm ID: {deleted_chicken_farm_id} is not Delete",  # บอกว่าลบไม่ได้
         )
 
     return JSONResponse(
         content={
             "status": "ok",
             "data": {
-                "student_id": deleted_student_id,
+                "chicken_farm_id": deleted_chicken_farm_id,
                 "deleted_count": deleted_count,
             },
         },
